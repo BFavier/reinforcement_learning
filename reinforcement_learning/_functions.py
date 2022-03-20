@@ -68,7 +68,7 @@ def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
                         # calculate the Q value of the final state
                         _, _, next_q = frozen_agent.play(next_environment)
                     # calculating loss
-                    loss = torch.nn.functional.mse_loss(q_A, agent.gamma * next_q + rewards)
+                    loss = torch.nn.functional.mse_loss(q_A, agent.gamma * next_q + rewards.to(next_q.device))
                     loss.backward()
                     batch_losses.append(loss.item())
                 update_loss.append(sum(batch_losses) / len(batch_losses))
@@ -85,9 +85,7 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
     A small loop to play against a trained agent
     """
     player_turn = player_starts
-    states = environment.initial_state()
-    game_is_over = environment.game_is_over(states)
-    while not game_is_over[0]:
+    while True:
         if player_turn:
             print(environment)
             while True:
@@ -99,12 +97,14 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
             environment = environment.apply(action)
             if environment.game_is_over():
                 print("You win !")
+                break
         else:
             environment.change_turn()
-            action, environment, _ = agent.play(environment, epsilon=agent.epsilon)
+            action, environment, _ = agent.play(environment)
             environment.change_turn()
             if environment.game_is_over():
                 print("You lose ...")
+                break
         print(action)
 
 

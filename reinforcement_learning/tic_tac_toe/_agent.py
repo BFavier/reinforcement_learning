@@ -23,6 +23,7 @@ class Agent(_Agent):
         returns a copy of the agent
         """
         agent = Agent(self.dim)
+        agent.to(self.convolution.weight.device)
         agent.activation = self.activation
         agent.load_state_dict(copy.deepcopy(self.state_dict()))
         return agent

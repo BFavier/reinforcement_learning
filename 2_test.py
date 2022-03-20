@@ -6,7 +6,7 @@ import pathlib
 path = pathlib.Path(__file__).parent
 agent = torch.load(path / "model.pty")
 
-play_against(agent, Environment(), Action)
+play_against(agent, Environment(), Action, player_starts=False)
 
 import IPython
 IPython.embed()

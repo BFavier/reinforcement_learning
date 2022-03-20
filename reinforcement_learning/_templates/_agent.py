@@ -61,7 +61,7 @@ class Agent(torch.nn.Module):
             sum of rewards
         """
         Q = self.Q(environment)
-        Q = torch.masked_fill(Q, ~environment.valid_plays_mask(), -float("inf"))
+        Q = torch.masked_fill(Q, ~environment.valid_plays_mask().to(Q.device), -float("inf"))
         action, q = self._choose_action(environment, Q)
         new_environment = environment.apply(action)
         return action, new_environment, q

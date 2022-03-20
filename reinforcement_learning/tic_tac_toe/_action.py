@@ -10,7 +10,7 @@ class Action(_Action):
     def from_string(cls, string: str) -> "Action":
         x, y = string.upper()
         return Action(torch.tensor([cls.columns.index(x)]),
-                      torch.tensor([int(y)]))
+                      torch.tensor([int(y)-1]))
     
     def __repr__(self):
         return "\n".join(f"{self.columns[x]}{3-y}" for x, y in zip(self.x, self.y))
