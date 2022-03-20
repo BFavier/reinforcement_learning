@@ -1,31 +1,28 @@
 from .._templates import Interpreter as _Interpreter
-from ._environement import Environment
+from ._environment import Environment
+from ._action import Action
 import torch
 
 
 class Interpreter(_Interpreter):
 
-    def __init__(self):
-        super().__init__()
-
-    def rewards(self, states: torch.Tensor, actions: torch.Tensor, next_states: torch.Tensor) -> torch.Tensor:
+    @classmethod
+    def rewards(cls, environment: Environment, action: Action, new_environment: Environment) -> torch.Tensor:
         """
         rewards the player for it's actions
 
         Parameters
         ----------
-        states : torch.Tensor
-            tensor of shape (N, Ly, Lx)
-        actions : torch.Tensor
-            tensor of shapes (N, *, 2)
-        next_states : torch.Tensor
-            tensor of shape (N, Ly, Lx)
+        environment : Environment
+            state before action
+        action : Action
+            action of the agent
+        new_environment : Environment
+            state after action
 
         Returns
         -------
         torch.Tensor :
             tensor of floats of shape (N)
         """
-        return (Environment.game_is_over(next_states) & ~Environment.game_is_over(states)).float()
-
-        
+        return (new_environment.game_is_over() & ~environment.game_is_over()).float()
