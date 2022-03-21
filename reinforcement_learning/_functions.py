@@ -70,8 +70,6 @@ def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
                         next_q = frozen_agent.Q(environment_B).reshape(N, -1).max(dim=1).values
                     # calculating loss
                     loss = torch.nn.functional.mse_loss(q_A, agent.gamma * next_q + rewards.to(next_q.device))
-                    if loss.isnan() or loss.isinf():
-                        print("oopsy")
                     loss.backward()
                     batch_losses.append(loss.item())
                 update_loss.append(sum(batch_losses) / len(batch_losses))
