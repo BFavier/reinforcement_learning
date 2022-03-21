@@ -31,7 +31,7 @@ class Environment(_Environment):
         Returns a copy of the environment after the actions have been applied
         """
         new_states = self.states.detach().clone()
-        new_states[:, action.y, action.x] = 1
+        new_states[torch.arange(len(new_states), device=action.y.device), action.y, action.x] = 1
         return Environment(states=new_states)
 
     def valid_plays_mask(self) -> torch.Tensor:

@@ -82,7 +82,7 @@ class Agent(_Agent):
         indices_x[replace] = random_x[replace]
         # build action
         q = torch.where(replace & (rand_q >= 0.), rand_q, q)
-        q = torch.where(q.isinf(), 0., q)
+        q = torch.where(q.isinf(), torch.zeros_like(q), q)
         if q.isnan().any() or q.isinf().any():
             print("wtf!")
         action = Action(indices_x, indices_y)

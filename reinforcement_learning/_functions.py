@@ -66,8 +66,7 @@ def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
                     rewards = rewards_A - rewards_B
                     with torch.no_grad():
                         # calculate the Q value of the final state
-                        N = len(environment_B)
-                        next_q = frozen_agent.Q(environment_B).reshape(N, -1).max(dim=1).values
+                        _, _, next_q = frozen_agent.play(environment_B)
                     # calculating loss
                     loss = torch.nn.functional.mse_loss(q_A, agent.gamma * next_q + rewards.to(next_q.device))
                     loss.backward()
