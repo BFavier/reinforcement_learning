@@ -51,6 +51,18 @@ class Environment:
         returns True if the given action is valid
         """
         raise NotImplementedError()
+    
+    def current_player_won(self) -> torch.Tensor:
+        """
+        return a tensor of booleans defining if the game is over
+        """
+        raise NotImplementedError()
+
+    def other_player_won(self) -> torch.Tensor:
+        """
+        return a tensor of booleans defining if the game is over
+        """
+        raise NotImplementedError()
 
     def game_is_over(self) -> torch.Tensor:
         """
@@ -58,7 +70,7 @@ class Environment:
         """
         raise NotImplementedError()
     
-    def extend(self, environment: "Environment"):
+    def extend(self, environment: "Environment") -> "Environment":
         """
         extend this environment set with another environment set
         """

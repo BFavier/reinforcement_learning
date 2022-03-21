@@ -11,7 +11,7 @@ class Environment(_Environment):
         """
         icons = [" X ", "   ", " O "]
         columns = [" A ", " B ", " C "]
-        return "\n".join(("\n"+"  "+"-"*11+"\n").join(f"{3 - i} " + "|".join(icons[i+1] for i in row) for i, row in enumerate(state)) for state in self.states) + "\n" + "  " + " ".join(col for col in columns)
+        return "\n\n".join(("\n"+"  "+"-"*11+"\n").join(f"{3 - i} " + "|".join(icons[i+1] for i in row) for i, row in enumerate(state)) + "\n" + "  " + " ".join(col for col in columns) for state in self.states)
 
     def __init__(self, states: Optional[torch.Tensor] = None):
         super().__init__()
@@ -52,18 +52,30 @@ class Environment(_Environment):
         mask = self.valid_plays_mask()
         y, x = action.yx[:, 0], action.yx[:, 1]
         return mask[:, y, x]
+    
+    def current_player_won(self) -> torch.Tensor:
+        """
+        return a tensor of booleans defining if the game is over
+        """
+        player_pawns = (self.states == 1)
+        return player_pawns.all(dim=2).any(dim=1) | player_pawns.all(dim=1).any(dim=1) | player_pawns[:, [0, 1, 2], [0, 1, 2]].all(dim=1) | player_pawns[:, [0, 1, 2], [2, 1, 0]].all(dim=1)
+
+    def other_player_won(self) -> torch.Tensor:
+        """
+        return a tensor of booleans defining if the game is over
+        """
+        player_pawns = (self.states == -1)
+        return player_pawns.all(dim=2).any(dim=1) | player_pawns.all(dim=1).any(dim=1) | player_pawns[:, [0, 1, 2], [0, 1, 2]].all(dim=1) | player_pawns[:, [0, 1, 2], [2, 1, 0]].all(dim=1)
 
     def game_is_over(self) -> torch.Tensor:
         """
         return a tensor of booleans defining if the game is over
         """
-        player_pawns = (self.states == 1)
-        player_A_wins = player_pawns.all(dim=2).any(dim=1) | player_pawns.all(dim=1).any(dim=1) | player_pawns[:, [0, 1, 2], [0, 1, 2]].all(dim=1) | player_pawns[:, [0, 1, 2], [2, 1, 0]].all(dim=1)
-        player_pawns = (self.states == -1)
-        player_B_wins = player_pawns.all(dim=2).any(dim=1) | player_pawns.all(dim=1).any(dim=1) | player_pawns[:, [0, 1, 2], [0, 1, 2]].all(dim=1) | player_pawns[:, [0, 1, 2], [2, 1, 0]].all(dim=1)
-        return player_A_wins or player_B_wins
+        N = self.states.shape[0]
+        all_filled = (self.states != 0).reshape(N, -1).all(dim=1)
+        return self.current_player_won() | self.other_player_won() | all_filled
 
-    def extend(self, environment: "Environment"):
+    def extend(self, environment: "Environment") -> "Environment":
         """
         extend this environment set with another environment set
         """

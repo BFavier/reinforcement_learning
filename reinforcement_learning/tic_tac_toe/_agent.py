@@ -50,7 +50,7 @@ class Agent(_Agent):
         X = self.deconvolution(X).squeeze(1)
         return X
 
-    def _choose_action(self, environment: Environment, Q_values: torch.Tensor) -> Tuple[Action, torch.Tensor]:
+    def _choose_action(self, environment: Environment, Q_values: torch.Tensor, valid_plays: torch.Tensor, epsilon: float = 0.) -> Tuple[Action, torch.Tensor]:
         """
         Given a state and the computed Q_values, returns the actions and next state
 
@@ -70,9 +70,23 @@ class Agent(_Agent):
         q, indices = Q_values.reshape(N, -1).max(dim=1)
         indices_y = indices // Lx
         indices_x = indices % Lx
+        # get indexes of best plays according to a random Q mapping
+        random_Q = torch.rand(Q_values.shape, device=Q_values.device)
+        random_Q = torch.masked_fill(random_Q, ~valid_plays, -1.)
+        rand_q, rand_indices = Q_values.reshape(N, -1).max(dim=1)
+        random_y = rand_indices // Lx
+        random_x = rand_indices % Lx
+        # generate a random number to remplace or not by the random action
+        replace = torch.rand(random_x.shape, device=random_x.device) < epsilon
+        indices_y[replace] = random_y[replace]
+        indices_x[replace] = random_x[replace]
+        # build action
+        q = torch.where(replace, rand_q, q)
+        if q.isnan().any() or q.isinf().any():
+            print("wtf!")
         action = Action(indices_x, indices_y)
         return action, q
-    
+
     @staticmethod
     def _transposed(states: torch.Tensor) -> torch.Tensor:
         return states.transpose(-1, -2)

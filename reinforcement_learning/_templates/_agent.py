@@ -25,7 +25,7 @@ class Agent(torch.nn.Module):
         """
         raise NotImplementedError()
 
-    def _choose_action(self, environment: Environment, Q_values: torch.Tensor) -> Tuple[Action, torch.Tensor]:
+    def _choose_action(self, environment: Environment, Q_values: torch.Tensor, valid_plays: torch.Tensor, epsilon: float = 0.) -> Tuple[Action, torch.Tensor]:
         """
         Given a state and the computed Q_values, returns the actions and next state
 
@@ -61,8 +61,9 @@ class Agent(torch.nn.Module):
             sum of rewards
         """
         Q = self.Q(environment)
-        Q = torch.masked_fill(Q, ~environment.valid_plays_mask().to(Q.device), -float("inf"))
-        action, q = self._choose_action(environment, Q)
+        valid_plays = environment.valid_plays_mask().to(Q.device)
+        Q = torch.masked_fill(Q, ~valid_plays, -float("inf"))
+        action, q = self._choose_action(environment, Q, valid_plays, epsilon=epsilon)
         new_environment = environment.apply(action)
         return action, new_environment, q
 

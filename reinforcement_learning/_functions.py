@@ -40,7 +40,7 @@ def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
     agent.train()
     try:
         for update in range(n_updates):
-            print(f"\t\tUpdate {update}:")
+            print(f"\t\tUpdate {update}: {len(replay_history)} replays")
             frozen_agent = agent.copy()
             frozen_agent.eval()
             # looping epochs
@@ -55,20 +55,23 @@ def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
                     # first player plays
                     action_A, environment_A, q_A = agent.play(env, epsilon=epsilon)
                     rewards_A = Inter.rewards(env, action_A, environment_A)
-                    replay_history.extend(environment_A)
+                    environment_A = environment_A.change_turn()
+                    replay_history = replay_history.extend(environment_A[~environment_A.game_is_over()])
                     # second player plays
-                    next_environment = environment_A.change_turn()
-                    action_B, environment_B, q_B = agent.play(next_environment)
-                    rewards_B = Inter.rewards(next_environment, action_B, environment_B)
-                    replay_history.extend(environment_B)
+                    action_B, environment_B, q_B = agent.play(environment_A)
+                    rewards_B = Inter.rewards(environment_A, action_B, environment_B)
+                    environment_B = environment_B.change_turn()
+                    replay_history = replay_history.extend(environment_B[~environment_B.game_is_over()])
                     # the actual reward is the difference of both rewards
-                    next_environment = environment_B.change_turn()
                     rewards = rewards_A - rewards_B
                     with torch.no_grad():
                         # calculate the Q value of the final state
-                        _, _, next_q = frozen_agent.play(next_environment)
+                        N = len(environment_B)
+                        next_q = frozen_agent.Q(environment_B).reshape(N, -1).max(dim=1).values
                     # calculating loss
                     loss = torch.nn.functional.mse_loss(q_A, agent.gamma * next_q + rewards.to(next_q.device))
+                    if loss.isnan() or loss.isinf():
+                        print("oopsy")
                     loss.backward()
                     batch_losses.append(loss.item())
                 update_loss.append(sum(batch_losses) / len(batch_losses))
@@ -87,7 +90,6 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
     player_turn = player_starts
     while True:
         if player_turn:
-            print(environment)
             while True:
                 try:
                     action = Act.from_string(input("your action: "))
@@ -95,18 +97,21 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
                     continue
                 break
             environment = environment.apply(action)
-            print(environment)
-            if environment.game_is_over():
-                print("You win !")
-                break
         else:
             environment = environment.change_turn()
             action, environment, _ = agent.play(environment)
             environment = environment.change_turn()
             print(f"agent action: {action}")
-            if environment.game_is_over():
-                print("You lose ...")
-                break
+        print(environment)
+        if environment.game_is_over():
+            if environment.current_player_won() or environment.other_player_won():
+                if player_turn:
+                    print("You win !")
+                else:
+                    print("You lose ...")
+            else:
+                print("draw")
+            break
         player_turn = not player_turn
 
 
