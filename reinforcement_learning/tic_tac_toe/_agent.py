@@ -70,7 +70,7 @@ class Agent(_Agent):
         q, indices = Q_values.reshape(N, -1).max(dim=1)
         indices_y = indices // Lx
         indices_x = indices % Lx
-        action = Action(indices_y, indices_x)
+        action = Action(indices_x, indices_y)
         return action, q
     
     @staticmethod

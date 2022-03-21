@@ -95,6 +95,7 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
                     continue
                 break
             environment = environment.apply(action)
+            print(environment)
             if environment.game_is_over():
                 print("You win !")
                 break
