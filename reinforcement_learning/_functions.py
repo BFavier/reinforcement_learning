@@ -90,7 +90,7 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
             print(environment)
             while True:
                 try:
-                    action = Act.from_string(input())
+                    action = Act.from_string(input("your action: "))
                 except Exception as e:
                     continue
                 break
@@ -99,13 +99,14 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
                 print("You win !")
                 break
         else:
-            environment.change_turn()
+            environment = environment.change_turn()
             action, environment, _ = agent.play(environment)
-            environment.change_turn()
+            environment = environment.change_turn()
+            print(f"agent action: {action}")
             if environment.game_is_over():
                 print("You lose ...")
                 break
-        print(action)
+        player_turn = not player_turn
 
 
 def plot_loss(loss_history: List[List[float]]):
