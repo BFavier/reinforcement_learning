@@ -40,6 +40,7 @@ def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
     agent.train()
     try:
         for update in range(n_updates):
+            replay_history = replay_history.sample(replay_history_size)
             print(f"\t\tUpdate {update}: {len(replay_history)} replays")
             frozen_agent = agent.copy()
             frozen_agent.eval()
@@ -47,28 +48,23 @@ def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
             update_loss = []
             for epoch in range(n_epochs):
                 optimizer.zero_grad()
-                replay_history = replay_history.sample(replay_history_size)
                 environment = replay_history[:n_batchs*batch_size]
                 # updating model parameters
                 batch_losses = []
                 for env in batchify(environment, batch_size, n_batchs):
                     # first player plays
-                    action_A, environment_A, q_A = agent.play(env, epsilon=epsilon)
-                    rewards_A = Inter.rewards(env, action_A, environment_A)
-                    environment_A = environment_A.change_turn()
-                    replay_history = replay_history.extend(environment_A[~environment_A.game_is_over()])
+                    action, new_environment, q = agent.play(env, epsilon=epsilon)
+                    rewards = Inter.rewards(env, action, new_environment)
+                    new_environment = new_environment.change_turn()
+                    replay_history = replay_history.extend(new_environment[~new_environment.game_is_over()])
                     # second player plays
-                    action_B, environment_B, q_B = agent.play(environment_A)
-                    rewards_B = Inter.rewards(environment_A, action_B, environment_B)
-                    environment_B = environment_B.change_turn()
-                    replay_history = replay_history.extend(environment_B[~environment_B.game_is_over()])
-                    # the actual reward is the difference of both rewards
-                    rewards = rewards_A - rewards_B
                     with torch.no_grad():
                         # calculate the Q value of the final state
-                        _, _, next_q = frozen_agent.play(environment_B)
+                        _, _, next_q = frozen_agent.play(new_environment)
+                        next_q = torch.where(new_environment.game_is_over().to(next_q.device),
+                                             torch.zeros_like(next_q), next_q)
                     # calculating loss
-                    loss = torch.nn.functional.mse_loss(q_A, agent.gamma * next_q + rewards.to(next_q.device))
+                    loss = torch.nn.functional.mse_loss(q, rewards.to(next_q.device) - agent.gamma * next_q)**0.5
                     loss.backward()
                     batch_losses.append(loss.item())
                 update_loss.append(sum(batch_losses) / len(batch_losses))

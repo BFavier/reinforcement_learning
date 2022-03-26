@@ -81,11 +81,3 @@ class Environment:
         returns a sample of 'n' or less oservations of the given environment set
         """
         raise NotImplementedError()
-    
-    def sample(self, n: int) -> "Environment":
-        """
-        returns a sample of 'n' or less oservations of the given environment set
-        """
-        n = min(n, len(self.states))
-        indexes = torch.randperm(len(self.states))
-        return self[indexes[:n]]

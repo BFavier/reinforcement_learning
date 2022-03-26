@@ -80,3 +80,11 @@ class Environment(_Environment):
         extend this environment set with another environment set
         """
         return Environment(states=torch.cat([self.states, environment.states], dim=0))
+
+    def sample(self, n: int) -> "Environment":
+        """
+        returns a sample of 'n' or less oservations of the given environment set
+        """
+        n = min(n, len(self.states))
+        indexes = torch.randperm(len(self.states))
+        return self[indexes[:n]]

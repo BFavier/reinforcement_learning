@@ -48,7 +48,7 @@ class Agent(_Agent):
         X = self.convolution(X)
         X = self.activation(X)
         X = self.deconvolution(X).squeeze(1)
-        return X
+        return torch.tanh(X)
 
     def _choose_action(self, environment: Environment, Q_values: torch.Tensor, valid_plays: torch.Tensor, epsilon: float = 0.) -> Tuple[Action, torch.Tensor]:
         """
