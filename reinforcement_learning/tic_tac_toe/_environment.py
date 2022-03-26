@@ -1,7 +1,7 @@
 from .._templates import Environment as _Environment
 from ._action import Action
 import torch
-from typing import Optional, Sequence
+from typing import Optional
 
 class Environment(_Environment):
 
@@ -85,6 +85,19 @@ class Environment(_Environment):
         """
         returns a sample of 'n' or less oservations of the given environment set
         """
+        # n = min(n, len(self.states))
+        # indexes = torch.randperm(len(self.states))
+        # return self[indexes[:n]]
+
         n = min(n, len(self.states))
-        indexes = torch.randperm(len(self.states))
-        return self[indexes[:n]]
+        N = len(self.states)
+        # bucket observations with
+        buckets = {L: (self.states != 0).reshape(N, -1).sum(dim=1) for L in range(9)}
+        samples = []
+        for i in range(9):
+            subset = self.states[buckets[i]]
+            k = min(len(subset), n//(9 - i))
+            indexes = torch.randperm(len(subset))
+            samples.append(subset[indexes[:k]])
+            n -= k
+        return Environment(states=torch.cat(samples, dim=0))

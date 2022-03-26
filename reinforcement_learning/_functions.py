@@ -81,6 +81,8 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
     A small loop to play against a trained agent
     """
     player_turn = player_starts
+    if player_turn:
+        print(environment)
     while True:
         if player_turn:
             while True:
@@ -110,8 +112,11 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
 
 def plot_loss(loss_history: List[List[float]]):
     f, ax = plt.subplots()
+    i = 0
     for loss in loss_history:
-        ax.scatter(range(len(loss)), loss)
+        j = i + len(loss)
+        ax.scatter(range(i, j), loss)
+        i = j
     ax.set_yscale("log")
     ax.set_xlabel("epochs")
     ax.set_ylabel("loss")
