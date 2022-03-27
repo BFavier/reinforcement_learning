@@ -2,6 +2,8 @@ from .._templates import Environment as _Environment
 from ._action import Action
 import torch
 from typing import Optional
+import numpy as np
+import math
 
 class Environment(_Environment):
 
@@ -91,13 +93,34 @@ class Environment(_Environment):
 
         n = min(n, len(self.states))
         N = len(self.states)
-        # bucket observations with
-        buckets = {L: (self.states != 0).reshape(N, -1).sum(dim=1) for L in range(9)}
+        # bucket observations by number of plays in it
+        buckets = {L: self.states[(self.states != 0).reshape(N, -1).sum(dim=1) == L] for L in range(9)}
+        # hash in each bucket similar plays
+        buckets = {k: self._filter_uniques(v) for k, v in buckets.items()}
+        # sample from each bucket
         samples = []
         for i in range(9):
-            subset = self.states[buckets[i]]
-            k = min(len(subset), n//(9 - i))
+            subset = buckets[i]
+            k = min(len(subset), math.ceil(n/(9 - i)))
             indexes = torch.randperm(len(subset))
             samples.append(subset[indexes[:k]])
             n -= k
         return Environment(states=torch.cat(samples, dim=0))
+
+    def _hash(self, states: torch.Tensor) -> torch.Tensor:
+        """
+        returns a hash of a given board state
+        """
+        N = len(states)
+        if N == 0:
+            return states
+        mask = 3**torch.arange(9).reshape(1, 3, 3)
+        return ((states+1) * mask).reshape(N, -1).sum(dim=1)
+
+    def _filter_uniques(self, states: torch.Tensor) -> torch.Tensor:
+        """
+        """
+        array = self._hash(states).detach().numpy()
+        _, index = np.unique(array, return_index=True)
+        index = torch.from_numpy(index)
+        return states[index]

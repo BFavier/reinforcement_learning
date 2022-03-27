@@ -94,6 +94,7 @@ def play_against(agent: Agent, environment: Environment, Act: Type[Action], play
             environment = environment.apply(action)
         else:
             environment = environment.change_turn()
+            print(agent.Q(environment).unsqueeze(0))
             action, environment, _ = agent.play(environment)
             environment = environment.change_turn()
             print(f"agent action: {action}")
