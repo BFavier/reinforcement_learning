@@ -1,10 +1,11 @@
+from os import environ
 import torch
 from ._templates import Agent, Environment, Interpreter, Action
 from typing import Type, List
 import matplotlib.pyplot as plt
 
 
-def batchify(data: torch.Tensor, batch_size: int, n_batches: int):
+def batchify(environment: Environment, batch_size: int, n_batches: int) -> Environment:
     """
     yields 'n_batches' batches of size 'batch_size' of the given data
 
@@ -19,17 +20,17 @@ def batchify(data: torch.Tensor, batch_size: int, n_batches: int):
     shuffle : bool
         if True, the data are shuffled before beeing batched
     """
-    N = len(data)
+    N = len(environment)
     for i in range(n_batches):
         if i*batch_size > N:
             break
-        yield data[i*batch_size:(i+1)*batch_size]
+        yield environment[i*batch_size:(i+1)*batch_size]
 
 
 def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
                optimizer: torch.optim.Optimizer, learning_rate: 1.0E-3,
                n_epochs: int = 100, n_updates: int = 100,
-               n_batchs: int = 10, batch_size: int = 100,
+               n_batches: int = 10, batch_size: int = 100,
                epsilon: float = 0., replay_history_size: int = 10000,
                loss_history: list = []):
     """
@@ -41,34 +42,39 @@ def train_loop(agent: Agent, Env: Type[Environment], Inter: Type[Interpreter],
     try:
         for update in range(n_updates):
             replay_history = replay_history.sample(replay_history_size)
+            frozen = agent.copy()
+            frozen.eval()
             print(f"\t\tUpdate {update}: {len(replay_history)} replays")
-            frozen_agent = agent.copy()
-            frozen_agent.eval()
+            # making the model play against itself for one turn
+            environment = replay_history.sample(n_batches*batch_size)
+            batches = []
+            for env in batchify(environment, batch_size, n_batches):
+                # first player plays
+                action = agent.play(environment, epsilon=epsilon)
+                new_env = env.apply(action)
+                reward = Inter.rewards(env, action, new_env)
+                new_env = new_env.change_turn()
+                replay_history = replay_history.extend(new_env[~new_env.game_is_over()])
+                # second player plays
+                with torch.no_grad():
+                    # calculate the Q value of the final state
+                    new_action = frozen.play(new_env)
+                # append
+                batches.append((env, action, reward, new_env, new_action))
             # looping epochs
             update_loss = []
             for epoch in range(n_epochs):
                 optimizer.zero_grad()
-                environment = replay_history[:n_batchs*batch_size]
-                # updating model parameters
-                batch_losses = []
-                for env in batchify(environment, batch_size, n_batchs):
-                    # first player plays
-                    action, new_environment, q = agent.play(env, epsilon=epsilon)
-                    rewards = Inter.rewards(env, action, new_environment)
-                    new_environment = new_environment.change_turn()
-                    replay_history = replay_history.extend(new_environment[~new_environment.game_is_over()])
-                    # second player plays
-                    with torch.no_grad():
-                        # calculate the Q value of the final state
-                        _, _, next_q = frozen_agent.play(new_environment)
-                        next_q = torch.where(new_environment.game_is_over().to(next_q.device),
-                                             torch.zeros_like(next_q), next_q)
-                    # calculating loss
-                    loss = torch.nn.functional.mse_loss(q, rewards.to(next_q.device) - agent.gamma * next_q)**0.5
+                losses = []
+                for env, action, reward, new_env, new_action in batches:
+                    q = agent.q(env, action)
+                    next_q = frozen.q(new_env, new_action)
+                    loss = torch.nn.functional.mse_loss(q, reward.to(next_q.device) - agent.gamma * next_q)**0.5
                     loss.backward()
-                    batch_losses.append(loss.item())
-                update_loss.append(sum(batch_losses) / len(batch_losses))
-                print(f"Epoch {epoch}: loss = {update_loss[-1]:.3g}")
+                    losses.append(loss.item())
+                loss = sum(losses)/len(losses)
+                print(f"Epoch {epoch}: loss = {loss:.3g}")
+                update_loss.append(loss)
                 optimizer.step()
             loss_history.append(update_loss)
     except KeyboardInterrupt as e:

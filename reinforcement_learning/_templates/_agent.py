@@ -18,32 +18,20 @@ class Agent(torch.nn.Module):
         self.symetries = [list(transforms) for k in range(len(self.transformations)+1)
                           for transforms in combinations(self.transformations, k)]
         super().__init__()
-
+    
     def copy(self) -> "Agent":
         """
-        returns a copy of the agent
+        create a copy of the agent
+        """
+        raise NotImplementedError()
+    
+    def q(self, environment: Environment, action: Action) -> torch.Tensor:
+        """
+        Returns the expected cumulated rewards of the given action
         """
         raise NotImplementedError()
 
-    def _choose_action(self, environment: Environment, Q_values: torch.Tensor, valid_plays: torch.Tensor, epsilon: float = 0.) -> Tuple[Action, torch.Tensor]:
-        """
-        Given a state and the computed Q_values, returns the actions and next state
-
-        Parameters
-        ----------
-        environment : Environment
-            the environment
-        Q_values : torch.Tensor
-            tensor of floats of shape (N, *, Ly, Lx)
-
-        Returns
-        -------
-        tuple :
-            the tuple (action, q) with q the expected cumulated sum of rewards
-        """
-        raise NotImplementedError()
-
-    def play(self, environment: Environment, epsilon: float = 0.) -> Tuple[Action, Environment, torch.Tensor]:
+    def play(self, environment: Environment, epsilon: float = 0.) -> Action:
         """
         Given an environment returns the next environment state
 
@@ -56,16 +44,10 @@ class Agent(torch.nn.Module):
 
         Returns
         -------
-        tuple :
-            the (action, new_environment, q) tuple, with q the expected cumulated
-            sum of rewards
+        Action:
+            the action of the agent
         """
-        Q = self.Q(environment)
-        valid_plays = environment.valid_plays_mask().to(Q.device)
-        Q = torch.masked_fill(Q, ~valid_plays, -float("inf"))
-        action, q = self._choose_action(environment, Q, valid_plays, epsilon=epsilon)
-        new_environment = environment.apply(action)
-        return action, new_environment, q
+        raise NotImplementedError()
 
     def _Q_function(self, states: torch.Tensor) -> torch.Tensor:
         """

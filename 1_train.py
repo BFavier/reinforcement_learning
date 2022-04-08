@@ -14,7 +14,7 @@ if torch.cuda.device_count() > 0:
 # training model
 loss_history = train_loop(agent, Environment, Interpreter, optimizer,
                           learning_rate=1.0E-3, n_updates=1000, n_epochs=10,
-                          n_batchs=1, batch_size=1000, epsilon=0.1)
+                          n_batches=1, batch_size=5000, epsilon=0.5)
 
 # saving model
 agent.to("cpu")

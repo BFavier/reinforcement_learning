@@ -87,16 +87,12 @@ class Environment(_Environment):
         """
         returns a sample of 'n' or less oservations of the given environment set
         """
-        # n = min(n, len(self.states))
-        # indexes = torch.randperm(len(self.states))
-        # return self[indexes[:n]]
-
         n = min(n, len(self.states))
-        N = len(self.states)
+        # filter unique plays
+        states = self._filter_uniques(self.states)
+        N = len(states)
         # bucket observations by number of plays in it
-        buckets = {L: self.states[(self.states != 0).reshape(N, -1).sum(dim=1) == L] for L in range(9)}
-        # hash in each bucket similar plays
-        buckets = {k: self._filter_uniques(v) for k, v in buckets.items()}
+        buckets = {L: states[(states != 0).reshape(N, -1).sum(dim=1) == L] for L in range(9)}
         # sample from each bucket
         samples = []
         for i in range(9):
