@@ -2,7 +2,7 @@ from os import environ
 import torch
 import torch.nn.functional as F
 from ._templates import Agent
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import matplotlib.pyplot as plt
 
 
@@ -29,13 +29,24 @@ def batchify(*data, batch_size: int, n_batches: int, shuffle: bool = True) -> Tu
         yield tuple(d[indexes[i*batch_size:(i+1)*batch_size]] for d in data)
 
 
+def extend_replay(replays: Optional[torch.Tensor], new_plays: List[torch.Tensor], n_replays: int) -> torch.Tensor:
+    """
+    return an extended replay
+    """
+    if replays is None:
+        return torch.cat(new_plays, dim=0)[-n_replays:]
+    else:
+        return torch.cat([replays]+new_plays, dim=0)[-n_replays:]
+
+
 def train_loop(agent: Agent, learning_rate: 1.0E-3, n_epochs: int = 100,
                n_updates: int = 100, n_batches: int = 10, batch_size: int = 100,
-               epsilon: float = 0., n_replays: int = 10000):
+               epsilon: float = 0., n_replays: int = 10000, n_games: int=10, n_turns: int=100):
     """
     train loop of the model
     """
-    optimizer = torch.optim.Adam(agent.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=learning_rate, betas=(0.9, 0.999))
+    game_over_replays = None
     state_replays = None
     action_replays = None
     next_state_replays = None
@@ -48,41 +59,46 @@ def train_loop(agent: Agent, learning_rate: 1.0E-3, n_epochs: int = 100,
             # making the model play against itself for one turn of each player
             print("playing ...")
             agent.eval()
-            state = agent.interpreter.initial_state()
-            states, actions, rewards, next_states = [], [], [], []
+            game_over, states, actions, rewards, next_states = [], [], [], [], []
             with torch.no_grad():
-                while not agent.interpreter.game_is_over(state):
-                    # first player plays
-                    action = agent.play(state, epsilon=epsilon)
-                    next_state = agent.interpreter.apply(state, action)
-                    next_state = agent.interpreter.change_turn(next_state)
-                    reward = agent.interpreter.rewards(state, action, next_state)
-                    # add the actions in the replay
-                    states.append(state)
-                    actions.append(action)
-                    rewards.append(reward)
-                    next_states.append(next_state)
-                    # change turn
-                    state = next_state
+                agent.eval()
+                game_is_over = False
+                for _ in range(n_games):
+                    state = agent.interpreter.initial_state()
+                    for _ in range(n_turns):
+                        # first player plays
+                        action, _ = agent.play(state, epsilon=epsilon)
+                        next_state = agent.interpreter.apply(state, action)
+                        next_state = agent.interpreter.change_turn(next_state)
+                        reward = agent.interpreter.rewards(state, action, next_state)
+                        # add the actions in the replay
+                        states.append(state)
+                        actions.append(action)
+                        rewards.append(reward)
+                        next_states.append(next_state)
+                        # change turn
+                        state = next_state
+                        # test if game is over
+                        game_is_over = agent.interpreter.game_is_over(state).item()
+                        game_over.append(torch.tensor([game_is_over]))
+                        if game_is_over:
+                            break
             # append new plays to replay
-            replays = [state_replays, action_replays, next_state_replays, reward_replays]
-            plays: list[list] = [states, actions, next_states, rewards]
-            for replay, _list in zip(replays, plays):
-                if replay is not None:
-                    _list.insert(0, replay)
-            state_replays = torch.cat(states)[-n_replays:]
-            action_replays = torch.cat(actions)[-n_replays:]
-            next_state_replays = torch.cat(next_states)[-n_replays:]
-            reward_replays = torch.cat(rewards)[-n_replays:]
+            game_over_replays = extend_replay(game_over_replays, game_over, n_replays) 
+            state_replays = extend_replay(state_replays, states, n_replays)
+            action_replays = extend_replay(action_replays, actions, n_replays)
+            next_state_replays = extend_replay(next_state_replays, next_states, n_replays)
+            reward_replays = extend_replay(reward_replays, rewards, n_replays)
+            print(f"{len(state_replays)} replays")
             # looping on epochs
             for epoch in range(n_epochs):
+                agent.train()
                 optimizer.zero_grad()
                 losses = []
-                for state, action, reward, next_state in batchify(state_replays, action_replays, reward_replays, next_state_replays, n_batches=n_batches, batch_size=batch_size):
-                    agent.train()
+                for game_over, state, action, reward, next_state in batchify(game_over_replays, state_replays, action_replays, reward_replays, next_state_replays, n_batches=n_batches, batch_size=batch_size):
                     q = agent.q(state, action)
-                    agent.eval()
-                    enemy_q = agent.Q(next_state)
+                    _, enemy_q = agent.play(next_state, epsilon=0.)
+                    enemy_q = torch.masked_fill(enemy_q, game_over.to(enemy_q.device), 0.)
                     loss = F.mse_loss(q+reward.to(q.device), -agent.gamma*enemy_q)**0.5
                     loss.backward()
                     losses.append(loss.item())
