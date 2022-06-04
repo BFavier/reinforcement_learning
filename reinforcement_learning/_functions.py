@@ -41,7 +41,7 @@ def extend_replay(replays: Optional[torch.Tensor], new_plays: List[torch.Tensor]
 
 def train_loop(agent: Agent, learning_rate: 1.0E-3, n_epochs: int = 100,
                n_updates: int = 100, n_batches: int = 10, batch_size: int = 100,
-               epsilon: float = 0., n_replays: int = 10000, n_games: int=10, n_turns: int=100):
+               epsilon: float = 0., n_replays: int = 10000, n_games: int=100, n_turns: int=100):
     """
     train loop of the model
     """
@@ -95,7 +95,7 @@ def train_loop(agent: Agent, learning_rate: 1.0E-3, n_epochs: int = 100,
                 agent.train()
                 optimizer.zero_grad()
                 losses = []
-                for game_over, state, action, reward, next_state in batchify(game_over_replays, state_replays, action_replays, reward_replays, next_state_replays, n_batches=n_batches, batch_size=batch_size):
+                for game_over, state, action, reward, next_state in batchify(game_over_replays, state_replays, action_replays, reward_replays, next_state_replays, n_batches=n_batches, batch_size=batch_size, shuffle=False):
                     q = agent.q(state, action)
                     _, enemy_q = agent.play(next_state, epsilon=0.)
                     enemy_q = torch.masked_fill(enemy_q, game_over.to(enemy_q.device), 0.)
